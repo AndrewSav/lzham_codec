@@ -414,7 +414,8 @@ namespace lzham
       {
          // Force Deflate to LZHAM with default window_bits.
          method = LZHAM_Z_LZHAM;
-         window_bits = LZHAM_Z_DEFAULT_WINDOW_BITS;
+		 if (window_bits != -LZHAM_Z_DEFAULT_WINDOW_BITS)
+            window_bits = LZHAM_Z_DEFAULT_WINDOW_BITS;
       }
 
 #ifdef LZHAM_Z_API_FORCE_WINDOW_BITS
