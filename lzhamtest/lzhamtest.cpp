@@ -132,7 +132,8 @@ struct comp_options
       m_deterministic_parsing(false),
       m_tradeoff_decomp_rate_for_comp_ratio(false),
       m_test_compressor_reinit(false),
-		m_table_update_rate(LZHAM_DEFAULT_TABLE_UPDATE_RATE)
+      m_use_zlib_header(false),
+      m_table_update_rate(LZHAM_DEFAULT_TABLE_UPDATE_RATE)
    {
    }
 
@@ -149,21 +150,22 @@ struct comp_options
       printf("Deterministic parsing: %u\n", m_deterministic_parsing);
       printf("Trade off decompression rate for compression ratio: %u\n", m_tradeoff_decomp_rate_for_comp_ratio);
       printf("Test compressor reinit: %u\n", m_test_compressor_reinit);
-		printf("Table update speed: %u\n", m_table_update_rate);
+      printf("Table update speed: %u\n", m_table_update_rate);
    }
 
-   lzham_compress_level m_comp_level;
-   int m_dict_size_log2;
-   bool m_compute_adler32_during_decomp;
-   int m_max_helper_threads;           // -1 = try to auto-detect
-   bool m_unbuffered_decompression;
-   bool m_verify_compressed_data;
-   bool m_randomize_params;
-   bool m_extreme_parsing;
-   bool m_deterministic_parsing;
-   bool m_tradeoff_decomp_rate_for_comp_ratio;
-   bool m_test_compressor_reinit;
+	lzham_compress_level m_comp_level;
+	int m_dict_size_log2;
+	bool m_compute_adler32_during_decomp;
+	int m_max_helper_threads;           // -1 = try to auto-detect
+	bool m_unbuffered_decompression;
+	bool m_verify_compressed_data;
+	bool m_randomize_params;
+	bool m_extreme_parsing;
+	bool m_deterministic_parsing;
+	bool m_tradeoff_decomp_rate_for_comp_ratio;
+	bool m_test_compressor_reinit;
 	uint m_table_update_rate;
+	bool m_use_zlib_header;
 };
 
 static void print_usage()
@@ -188,6 +190,7 @@ static void print_usage()
    printf("           because the main thread is counted separately.\n");
    printf("-v - Immediately decompress compressed file after compression for verification.\n");
    printf("-x - Extreme parsing, for slight compression gain (Uber only, MUCH slower).\n");
+   printf("-z - Write/read zlib header/adler footer.\n");
    printf("-o - Permit the compressor to trade off decompression rate for higher ratios.\n");
    printf("     Note: This flag can drop the decompression rate by 30%% or more.\n");
    printf("-e - Enable deterministic parsing for slightly higher compression and\n");
@@ -421,8 +424,10 @@ static bool compress_file(ilzham &lzham_dll, const char* pSrc_filename, const ch
    if (options.m_deterministic_parsing)
       params.m_compress_flags |= LZHAM_COMP_FLAG_DETERMINISTIC_PARSING;
    if (options.m_tradeoff_decomp_rate_for_comp_ratio)
-      params.m_compress_flags |= LZHAM_COMP_FLAG_TRADEOFF_DECOMPRESSION_RATE_FOR_COMP_RATIO;
-  
+	   params.m_compress_flags |= LZHAM_COMP_FLAG_TRADEOFF_DECOMPRESSION_RATE_FOR_COMP_RATIO;
+   if (options.m_use_zlib_header)
+		params.m_compress_flags |= LZHAM_COMP_FLAG_WRITE_ZLIB_STREAM;
+
    params.m_table_update_rate = options.m_table_update_rate;
       
    if (pSeed_filename)
@@ -734,8 +739,10 @@ static bool decompress_file(ilzham &lzham_dll, const char* pSrc_filename, const 
    if (options.m_compute_adler32_during_decomp)
       params.m_decompress_flags |= LZHAM_DECOMP_FLAG_COMPUTE_ADLER32;
    if (options.m_unbuffered_decompression)
-      params.m_decompress_flags |= LZHAM_DECOMP_FLAG_OUTPUT_UNBUFFERED;
-	
+	   params.m_decompress_flags |= LZHAM_DECOMP_FLAG_OUTPUT_UNBUFFERED;
+   if (options.m_use_zlib_header)
+		params.m_decompress_flags |= LZHAM_DECOMP_FLAG_READ_ZLIB_STREAM;
+
 	params.m_table_update_rate = options.m_table_update_rate;
    	
    timer_ticks start_time = timer::get_ticks();
@@ -1468,7 +1475,12 @@ int main_internal(string_array cmd_line, int num_helper_threads, ilzham &lzham_d
                options.m_deterministic_parsing = true;
                break;
             }
-            case 'o':
+			case 'z':
+			{
+				options.m_use_zlib_header = true;
+				break;
+			}
+			case 'o':
             {
                options.m_tradeoff_decomp_rate_for_comp_ratio = true;
                break;
